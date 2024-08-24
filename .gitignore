@@ -10,3 +10,6 @@ tensorboard_3d
 events.out*
 ckpt
 release
+LangSplat_reasoning_mask.zip
+ckpts
+eval_result

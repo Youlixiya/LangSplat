@@ -144,15 +144,31 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.txt")
         cam_extrinsics = read_extrinsics_text(cameras_extrinsic_file)
         cam_intrinsics = read_intrinsics_text(cameras_intrinsic_file)
-
+    
     reading_dir = "images" if images == None else images
-    # reading_dir_F = "language_feature" if language_feature == None else language_feature
     cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir))
     cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
-
     if eval:
-        train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
-        test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
+        if os.path.exists(os.path.join(path, "segmentations")):
+            eval_names = os.listdir(os.path.join(path, "segmentations"))
+            # print(eval_names)
+            train_cam_infos = [c for idx, c in enumerate(cam_infos) if c.image_name not in eval_names]
+            test_cam_infos = [c for idx, c in enumerate(cam_infos) if c.image_name in eval_names]
+        elif os.path.exists(os.path.join(path, "images_train")):
+            train_dir = os.path.join(path, "images_train")
+            train_names = sorted(os.listdir(train_dir))
+            train_names = [train_name.split('.')[0] for train_name in train_names]
+            train_cam_infos = []
+            test_cam_infos = []
+            for cam_info in cam_infos:
+                if cam_info.image_name in train_names:
+                    train_cam_infos.append(cam_info)
+                else:
+                    test_cam_infos.append(cam_info)
+        else:
+            
+            train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
+            test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
     else:
         train_cam_infos = cam_infos
         test_cam_infos = []

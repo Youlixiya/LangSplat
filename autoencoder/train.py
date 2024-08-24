@@ -36,7 +36,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     dataset_path = args.dataset_path
     num_epochs = args.num_epochs
-    data_dir = f"{dataset_path}/language_features"
+    # print(dataset_path)
+    data_dir = f"../{dataset_path}/language_features"
     os.makedirs(f'ckpt/{args.dataset_name}', exist_ok=True)
     train_dataset = Autoencoder_dataset(data_dir)
     train_loader = DataLoader(

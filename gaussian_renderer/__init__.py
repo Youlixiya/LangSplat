@@ -89,6 +89,7 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
         # language_feature_precomp = torch.sigmoid(language_feature_precomp)
     else:
         language_feature_precomp = torch.zeros((1,), dtype=opacity.dtype, device=opacity.device)
+        # language_feature_precomp = colors_precomp * 0.0
         
     # Rasterize visible Gaussians to image, obtain their radii (on screen). 
     # start_time = time.time()

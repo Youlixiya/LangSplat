@@ -1,10 +1,10 @@
 #!/bin/bash
-CASE_NAME="teatime"
+CASE_NAME="ramen"
 
 # path to lerf_ovs/label
 gt_folder="../data/lerf_ovs/label"
 
-root_path="../"
+root_path=".."
 
 python evaluate_iou_loc.py \
         --dataset_name ${CASE_NAME} \
