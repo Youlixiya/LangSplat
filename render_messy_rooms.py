@@ -86,6 +86,10 @@ def load_mask(mask_path):
     """Load the mask from the given path."""
     return np.array(Image.open(mask_path).convert('L'))  # Convert to grayscale
 
+def resize_mask(mask, target_shape):
+    """Resize the mask to the target shape."""
+    return np.array(Image.fromarray(mask).resize((target_shape[1], target_shape[0]), resample=Image.NEAREST))
+
 def activate_stream(sem_map, 
                     gt_masks,
                     image, 
@@ -148,7 +152,8 @@ def activate_stream(sem_map,
             # union = np.sum(np.logical_or(mask_gt, mask_pred))
             # iou = np.sum(intersection) / np.sum(union)
             # iou_lvl[i] = iou
-
+            if mask_pred.shape != gt_mask.shape:
+                gt_mask = resize_mask(gt_mask, mask_pred.shape)
             iou = calculate_iou(gt_mask, mask_pred)
             biou = boundary_iou(gt_mask, mask_pred)
             iou_lvl[i] = iou
@@ -193,9 +198,11 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
     # gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
     # render_npy_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders_npy")
     # gts_npy_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt_npy")
-    mask_path = os.path.join(source_path, 'test_mask')
+    mask_path = os.path.join(source_path, 'segmentations')
+
     
     test_views = os.listdir(mask_path)
+    test_views = [test_view for test_view in test_views if test_view != 'classes.txt']
     # print(source_path)
     # makedirs(render_npy_path, exist_ok=True)
     # makedirs(heatmap_path, exist_ok=True)
@@ -211,20 +218,20 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
         colormap_min=-1.0,
         colormap_max=1.0,
     )
-    if args.dataset_name == 'figurines':
-        prompt_dict = {"green apple":"what is green fruit","green toy chair":"what is suitable for people to sit down and is green","old camera":"what can be used to take pictures and is black","porcelain hand":"what is like a part of a person","red apple":"what is red fruit","red toy chair":"what is suitable for people to sit down and is red","rubber duck with red hat":"which is the small yellow rubber duck"}
-    elif args.dataset_name == 'ramen':
-        prompt_dict = {"chopsticks":"which one is the chopstic on the side of yellow bowl","egg":"what is the round, golden, protein-rich object in the bowl","glass of water":"which one is a transparent cup with water in it", "pork belly":"which is the big piece of meat in the bowl", "wavy noodles in bowl":"which are long and thin noodles","yellow bowl":"which is the yellow bowl used to hold noodles"}
-    elif args.dataset_name == 'teatime':
-        prompt_dict = {"apple":"which is red fruit","bag of cookies":"which is the brown bag on the side of the plate","coffee mug":"which cup is used for coffee","cookies on a plate":"which are the cookies","paper napkin":"what can be used to wipe hands","plate":"what can be used to hold cookies","sheep":"which is a cute white doll","spoon handle":"which is spoon handle","stuffed bear":"which is the brown bear doll","tea in a glass":"which is the drink in the transparent glass"}
-    elif args.dataset_name == 'bed':
-        prompt_dict = {"banana":"which is the yellow fruit" ,"black leather shoe":"which can be worn on the foot","camera":"which can be used to take photos","hand":"which is the part of person, excluding other objects","red bag":"which is red and leather","white sheet":"where is a good place to lie down"}       
-    elif args.dataset_name == 'bench':
-        prompt_dict = {"dressing doll":"who has long blond hair","green grape":"which is green fruit", "mini offroad car":"which one is the model of the vehicle","orange cat":"which is an animal","pebbled concrete wall":"which is made of many stones", "Portuguese egg tart":"which is like baked food","wood":"what is made of wood"}
-    elif args.dataset_name == 'lawn':
-        prompt_dict = {"red apple":"which is the red fruit","New York Yankees cap":"which is worn on the head and is white","stapler":"which can be uesd to bind books","black headphone":"which is worn on the ear and is black","hand soap":"which is bottled", "green lawn":"which is made of a lot of grass"}
+    # if args.dataset_name == 'figurines':
+    #     prompt_dict = {"green apple":"what is green fruit","green toy chair":"what is suitable for people to sit down and is green","old camera":"what can be used to take pictures and is black","porcelain hand":"what is like a part of a person","red apple":"what is red fruit","red toy chair":"what is suitable for people to sit down and is red","rubber duck with red hat":"which is the small yellow rubber duck"}
+    # elif args.dataset_name == 'ramen':
+    #     prompt_dict = {"chopsticks":"which one is the chopstic on the side of yellow bowl","egg":"what is the round, golden, protein-rich object in the bowl","glass of water":"which one is a transparent cup with water in it", "pork belly":"which is the big piece of meat in the bowl", "wavy noodles in bowl":"which are long and thin noodles","yellow bowl":"which is the yellow bowl used to hold noodles"}
+    # elif args.dataset_name == 'teatime':
+    #     prompt_dict = {"apple":"which is red fruit","bag of cookies":"which is the brown bag on the side of the plate","coffee mug":"which cup is used for coffee","cookies on a plate":"which are the cookies","paper napkin":"what can be used to wipe hands","plate":"what can be used to hold cookies","sheep":"which is a cute white doll","spoon handle":"which is spoon handle","stuffed bear":"which is the brown bear doll","tea in a glass":"which is the drink in the transparent glass"}
+    # elif args.dataset_name == 'bed':
+    #     prompt_dict = {"banana":"which is the yellow fruit","black leather shoe":"which can be worn on the foot","camera":"which can be used to take photos","hand":"which is the part of person, excluding other objects","red bag":"which is red and leather","white sheet":"where is a good place to lie down"}       
+    # elif args.dataset_name == 'bench':
+    #     prompt_dict = {"dressing doll":"which is a cute humanoid doll that girls like","green grape":"which is green fruit","mini offroad car":"which one is the model of the vehicle","orange cat":"which is an animal","pebbled concrete wall":"which is made of many stones", "Portuguese egg tart":"which is like baked food","wood":"which is made of wood"}
+    # elif args.dataset_name == 'lawn':
+    #     prompt_dict = {"red apple":"which is the red fruit","New York Yankees cap":"which is worn on the head and is white","stapler":"which is small device used for stapling paper","black headphone":"which can convert electric signals into sounds","hand soap":"which is bottled", "green lawn":"which is an area of ground covered in short grass"}
 # 
-# 
+#   
     # print(views)
     for idx, view in enumerate(tqdm(views, desc="Rendering progress")):
         output_1 = render(view, gaussians_1, pipeline, background, args)
@@ -250,8 +257,8 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
         view_mask_path = os.path.join(mask_path, image_index)
         masks_name = os.listdir(view_mask_path)
         text_prompts = [mask_name.split('.')[0] for mask_name in masks_name]
-        if args.reasoning:
-            text_prompts = [prompt_dict[text_prompt] for text_prompt in text_prompts]
+        # if args.reasoning:
+        #     text_prompts = [prompt_dict[text_prompt] for text_prompt in text_prompts]
         gt_masks = [load_mask(os.path.join(view_mask_path, mask_name)) for mask_name in masks_name]
 
         sem_feat = torch.stack([language_feature_image_1, language_feature_image_2, language_feature_image_3]).permute(0, 2, 3, 1)

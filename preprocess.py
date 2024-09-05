@@ -347,6 +347,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str, required=True)
+    parser.add_argument('--images', type=str, default='images')
     parser.add_argument('--resolution', type=int, default=-1)
     parser.add_argument('--sam_ckpt_path', type=str, default="ckpts/sam_vit_h_4b8939.pth")
     args = parser.parse_args()
@@ -354,7 +355,7 @@ if __name__ == '__main__':
 
     dataset_path = args.dataset_path
     sam_ckpt_path = args.sam_ckpt_path
-    img_folder = os.path.join(dataset_path, 'images')
+    img_folder = os.path.join(dataset_path, args.images)
     data_list = os.listdir(img_folder)
     data_list.sort()
 
