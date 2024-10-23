@@ -1,7 +1,7 @@
 import os
 import random
 import argparse
-
+from PIL import Image
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -347,6 +347,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_path', type=str, required=True)
+    parser.add_argument('--dataset_type', type=str, required=True, choices=['hypernerf', 'NeRF-DS', 'colmap'])
     parser.add_argument('--images', type=str, default='images')
     parser.add_argument('--resolution', type=int, default=-1)
     parser.add_argument('--sam_ckpt_path', type=str, default="ckpts/sam_vit_h_4b8939.pth")
@@ -355,9 +356,21 @@ if __name__ == '__main__':
 
     dataset_path = args.dataset_path
     sam_ckpt_path = args.sam_ckpt_path
-    img_folder = os.path.join(dataset_path, args.images)
-    data_list = os.listdir(img_folder)
-    data_list.sort()
+    if args.dataset_type == 'colmap':
+        img_folder = os.path.join(dataset_path, args.images)
+        data_list = os.listdir(img_folder)
+        data_list.sort()
+    elif args.dataset_type == 'hypernerf':
+        img_folder = os.path.join(dataset_path, 'rgb/2x')
+        data_list = os.listdir(img_folder)
+        data_list.sort()
+        data_list = data_list[::4]
+    else:
+        img_folder = os.path.join(dataset_path, 'rgb/1x')
+        data_list = os.listdir(img_folder)
+        data_list.sort()
+        data_list = [img for img in data_list if 'left' in img]
+    
 
     model = OpenCLIPNetwork(OpenCLIPNetworkConfig)
     sam = sam_model_registry["vit_h"](checkpoint=sam_ckpt_path).to('cuda')
@@ -376,25 +389,25 @@ if __name__ == '__main__':
     WARNED = False
     for data_path in data_list:
         image_path = os.path.join(img_folder, data_path)
-        image = cv2.imread(image_path)
+        image = np.array(Image.open(image_path))
 
-        orig_w, orig_h = image.shape[1], image.shape[0]
-        if args.resolution == -1:
-            if orig_h > 1080:
-                if not WARNED:
-                    print("[ INFO ] Encountered quite large input images (>1080P), rescaling to 1080P.\n "
-                        "If this is not desired, please explicitly specify '--resolution/-r' as 1")
-                    WARNED = True
-                global_down = orig_h / 1080
-            else:
-                global_down = 1
-        else:
-            global_down = orig_w / args.resolution
+        # orig_w, orig_h = image.shape[1], image.shape[0]
+        # if args.resolution == -1:
+        #     if orig_h > 1080:
+        #         if not WARNED:
+        #             print("[ INFO ] Encountered quite large input images (>1080P), rescaling to 1080P.\n "
+        #                 "If this is not desired, please explicitly specify '--resolution/-r' as 1")
+        #             WARNED = True
+        #         global_down = orig_h / 1080
+        #     else:
+        #         global_down = 1
+        # else:
+        #     global_down = orig_w / args.resolution
             
-        scale = float(global_down)
-        resolution = (int( orig_w  / scale), int(orig_h / scale))
+        # scale = float(global_down)
+        # resolution = (int( orig_w  / scale), int(orig_h / scale))
         
-        image = cv2.resize(image, resolution)
+        # image = cv2.resize(image, resolution)
         image = torch.from_numpy(image)
         img_list.append(image)
     images = [img_list[i].permute(2, 0, 1)[None, ...] for i in range(len(img_list))]

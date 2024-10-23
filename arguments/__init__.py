@@ -55,7 +55,7 @@ class ModelParams(ParamGroup):
         self._white_background = False
         self._feature_level = -1
         self.data_device = "cuda"
-        self.eval = False
+        self.eval = True
         super().__init__(parser, "Loading Parameters", sentinel)
 
     def extract(self, args):
@@ -81,7 +81,7 @@ class OptimizationParams(ParamGroup):
         self.feature_lr = 0.0025
         self.opacity_lr = 0.05
         self.language_feature_lr = 0.0025 # TODO: update
-        self.include_feature = True # Set to False if train the original gs
+        # self.include_feature = True # Set to False if train the original gs
         self.scaling_lr = 0.005
         self.rotation_lr = 0.001
         self.percent_dense = 0.01

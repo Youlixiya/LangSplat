@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 from PIL import Image
 import torch
+import time
 from scene import Scene
 from pathlib import Path
 import os
@@ -86,10 +87,6 @@ def load_mask(mask_path):
     """Load the mask from the given path."""
     return np.array(Image.open(mask_path).convert('L'))  # Convert to grayscale
 
-def resize_mask(mask, target_shape):
-    """Resize the mask to the target shape."""
-    return np.array(Image.fromarray(mask).resize((target_shape[1], target_shape[0]), resample=Image.NEAREST))
-
 def activate_stream(sem_map, 
                     gt_masks,
                     image, 
@@ -152,8 +149,7 @@ def activate_stream(sem_map,
             # union = np.sum(np.logical_or(mask_gt, mask_pred))
             # iou = np.sum(intersection) / np.sum(union)
             # iou_lvl[i] = iou
-            if mask_pred.shape != gt_mask.shape:
-                gt_mask = resize_mask(gt_mask, mask_pred.shape)
+
             iou = calculate_iou(gt_mask, mask_pred)
             biou = boundary_iou(gt_mask, mask_pred)
             iou_lvl[i] = iou
@@ -192,75 +188,15 @@ def activate_stream(sem_map,
     return iou_scores, biou_scores
 
 def render_set(model_path, source_path, name, iteration, views, gaussians_1, gaussians_2, gaussians_3, pipeline, background, args, clip_model, ae_model):
-    # render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
-    # heatmap_path = os.path.join(model_path, name, "ours_{}".format(iteration), "heatmaps")
-    # feature_path = os.path.join(model_path, name, "ours_{}".format(iteration), "features")
-    # gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
-    # render_npy_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders_npy")
-    # gts_npy_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt_npy")
-    mask_path = os.path.join(source_path, 'segmentations')
+   
+    text_prompts = ['']
+    clip_model.set_positives(text_prompts)
 
-    
-    test_views = os.listdir(mask_path)
-    test_views = [test_view for test_view in test_views if test_view != 'classes.txt']
-    # print(source_path)
-    # makedirs(render_npy_path, exist_ok=True)
-    # makedirs(heatmap_path, exist_ok=True)
-    # makedirs(gts_npy_path, exist_ok=True)
-    # makedirs(render_path, exist_ok=True)
-    # makedirs(gts_path, exist_ok=True)
+    view = views[0]
+    t = []
+    for i in tqdm(range(100)):
+        t1 = time.time()
 
-    iou_scores = {}
-    biou_scores = {}
-    colormap_options = colormaps.ColormapOptions(
-        colormap="turbo",
-        normalize=True,
-        colormap_min=-1.0,
-        colormap_max=1.0,
-    )
-    if args.dataset_name == 'figurines':
-        prompt_dict = {"green apple":"what is green fruit","green toy chair":"what is suitable for people to sit down and is green","old camera":"what can be used to take pictures and is black","porcelain hand":"what is like a part of a person","red apple":"what is red fruit","red toy chair":"what is suitable for people to sit down and is red","rubber duck with red hat":"which is the small yellow rubber duck"}
-    elif args.dataset_name == 'ramen':
-        prompt_dict = {"chopsticks":"which one is the chopstic on the side of yellow bowl","egg":"what is the round, golden, protein-rich object in the bowl","glass of water":"which one is a transparent cup with water in it", "pork belly":"which is the big piece of meat in the bowl", "wavy noodles in bowl":"which are long and thin noodles","yellow bowl":"which is the yellow bowl used to hold noodles"}
-    elif args.dataset_name == 'teatime':
-        prompt_dict = {"apple":"which is red fruit","bag of cookies":"which is the brown bag on the side of the plate","coffee mug":"which cup is used for coffee","cookies on a plate":"which are the cookies","paper napkin":"what can be used to wipe hands","plate":"what can be used to hold cookies","sheep":"which is a cute white doll","spoon handle":"which is spoon handle","stuffed bear":"which is the brown bear doll","tea in a glass":"which is the drink in the transparent glass"}
-    elif args.dataset_name == 'bed':
-        prompt_dict ={'banana':'which is a fruit with a yellow peel',
-  'black leather shoe': 'which is an object that can be worn on the feet',
-  'camera': 'which is a device used for taking pictures',
-  'hand': 'which is a part of the human body',
-  'red bag': 'which is red,leathern object used to put items in',
-  'white sheet': 'which is a piece of fabric used for covering a bed'}
-        # prompt_dict ={"banana":"which is a yellow fruit often eaten as a snack","black leather shoe":"which is a black shoe with a gold buckle","camera":"which is a device used for taking pictures","hand":"which is a part of the human body used for holding objects","red bag":"which is a red bag with a quilted pattern","white sheet":"which is a white sheet with black lines"}
-        # prompt_dict = {"banana":"which is the yellow fruit","black leather shoe":"which can be worn on the foot","camera":"which can be used to take photos","hand":"which is the part of person, excluding other objects","red bag":"which is red and leather","white sheet":"where is a good place to lie down"}       
-    elif args.dataset_name == 'bench':
-        prompt_dict ={"dressing doll": "which is an object used for dressing up",
-  "green grape": "which is a fruit that is green",
-  "mini offroad car": "which is a small vehicle used for off-road driving",
-  "orange cat": "which is an animal that is orange",
-  "pebbled concrete wall": "which is a wall made of pebbled concrete",
-  "Portuguese egg tart": "which is a dessert that is a Portuguese egg tart",
-  "wood": "which is the object made of wood"}
-        # prompt_dict = {"dressing doll":"which is a toy used for dressing up","green grape":"which is a green fruit that grows in clusters","mini offroad car":"which is a small toy car designed for off-road use","orange cat":"which is a feline with orange fur","pebbled concrete wall":"which is a wall made of concrete with embedded pebbles","Portuguese egg tart":"which is a pastry with a custard filling","wood":"which is a material used for building and furniture"}
-        # prompt_dict = {"dressing doll":"which is a cute humanoid doll that girls like","green grape":"which is green fruit","mini offroad car":"which one is the model of the vehicle","orange cat":"which is an animal","pebbled concrete wall":"which is made of many stones", "Portuguese egg tart":"which is like baked food","wood":"which is made of wood"}
-    elif args.dataset_name == 'lawn':
-        prompt_dict = {"red apple":"which is a red fruit rich in vitamins","New York Yankees cap":"which is a cap with a sports team logo","stapler":"which is a device used for fastening paper","black headphone":"which is a black device used for listening to audio","hand soap":"which is a liquid used for cleaning hands","green lawn":"which is a green grassy area"}
-        # prompt_dict = {"red apple":"which is the red fruit","New York Yankees cap":"which is worn on the head and is white","stapler":"which is small device used for stapling paper","black headphone":"which can convert electric signals into sounds","hand soap":"which is bottled", "green lawn":"which is an area of ground covered in short grass"}
-    elif args.dataset_name == 'room':
-        prompt_dict = {"wood":"which is a type of material used for furniture and construction","shrilling chicken":"which is a toy that makes a loud noise when squeezed","weaving basket":"which is a container made from woven materials","rabbit":"which is a small, furry animal with long ears","dinosaur":"which is a prehistoric creature that lived millions of years ago","baseball":"which is a round, white ball used in a sport"}
-        # prompt_dict = {"wood":"which is background wood board","shrilling chicken":"which is a yellow animal doll","weaving basket":"which can be uesd to hold a water bottle","rabbit":"which is a cute mammal doll","dinosaur":"which has a long tail", "baseball":"which is spherical and white"}
-    elif args.dataset_name == 'sofa':
-        prompt_dict = {'Pikachu': 'which is a yellow electric-type creature',
-  'a stack of UNO cards': 'which is a deck of playing cards',
-  'grey sofa': 'which is a piece of furniture',
-  'a red Nintendo Switch joy-con controller': 'which is a handheld gaming device',
-  'Gundam': 'which is a model of a robot',
-  'Xbox wireless controller': 'which is a device used to play video games'}
-        prompt_dict = {"Pikachu":"which is a yellow plush toy with a hat","a stack of UNO cards":"which is a deck of cards with a colorful design","grey sofa":"which is a piece of furniture with a soft, grey surface","a red Nintendo Switch joy-con controller":"which is a red handheld gaming device","Gundam":"which is a blue and white action figure","Xbox wireless controller":"which is a white gaming controller with buttons and joysticks"}
-        # prompt_dict = {"Pikachu":"which is the yellow doll","a stack of UNO cards":"what is made of cards stacked together", "grey sofa":"where can I sit down","a red Nintendo Switch joy-con controller":"which is red and looks like a controller","Gundam":"which is the body of a robot model","Xbox wireless controller":"which can be used to play games and is large and white"}
-# 
-    # print(views)
-    for idx, view in enumerate(tqdm(views, desc="Rendering progress")):
         output_1 = render(view, gaussians_1, pipeline, background, args)
         output_2 = render(view, gaussians_2, pipeline, background, args)
         output_3 = render(view, gaussians_3, pipeline, background, args)
@@ -268,80 +204,20 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
         language_feature_image_1 = output_1['language_feature_image']
         language_feature_image_2 = output_2['language_feature_image']
         language_feature_image_3 = output_3['language_feature_image']
-        
-        image_name = view.image_name
-        image_index = image_name.split('_')[-1]
-        if args.reasoning:
-            reasoning = '_reasoning'
-        else:
-            reasoning = ''
-        save_path = os.path.join(model_path, name, f"ours_{iteration}{reasoning}", '{0:05d}'.format(idx))
-        print(image_index)
-        print(test_views)
-        
-        if image_index not in test_views:
-            continue
-        view_mask_path = os.path.join(mask_path, image_index)
-        masks_name = os.listdir(view_mask_path)
-        text_prompts = [mask_name.split('.')[0] for mask_name in masks_name]
-        if args.reasoning:
-            text_prompts = [prompt_dict[text_prompt] for text_prompt in text_prompts]
-        gt_masks = [load_mask(os.path.join(view_mask_path, mask_name)) for mask_name in masks_name]
-
         sem_feat = torch.stack([language_feature_image_1, language_feature_image_2, language_feature_image_3]).permute(0, 2, 3, 1)
         lvl, h, w, _ = sem_feat.shape
         restored_feat = ae_model.decode(sem_feat.flatten(0, 2))
         restored_feat = restored_feat.view(lvl, h, w, -1) 
-        clip_model.set_positives(text_prompts)
-        # valid_map = clip_model.get_max_across(sem_map)
+        valid_map = clip_model.get_max_across(restored_feat)
 
-        iou_score, biou_score = activate_stream(restored_feat,
-                                                gt_masks,
-                                                rendering.permute(1, 2, 0),
-                                                clip_model,
-                                                Path(save_path),
-                                                None,
-                                                0.4,
-                                                colormap_options,
-                                                )
-        # print(iou_score)
-        # print(biou_score)
-        for key in iou_score.keys():
-            if key not in iou_scores:
-                iou_scores[key] = [iou_score[key]]
-            else:
-                iou_scores[key].append(iou_score[key])
-            if key not in biou_scores:
-                biou_scores[key] = [biou_score[key]]
-            else:
-                biou_scores[key].append(biou_score[key])
-    mean_ious = []
-    mean_bious = []
-    for key in iou_scores.keys():
-        mean_iou = np.mean(iou_scores[key])
-        mean_biou = np.mean(biou_scores[key])
-        mean_ious.append(mean_iou)
-        mean_bious.append(mean_biou)
-        print(f'{key} iou: {mean_iou} biou: {mean_biou}')
-    print(f'mean iou: {np.mean(mean_ious)} biou: {np.mean(mean_bious)}')
-    
-        # if not args.include_feature:
-            
-        #     rendering = output["render"]
-        # else:
-        #     output = render(view, gaussians, pipeline, background, args)
-        #     rendering = output["language_feature_image"]
-            
-        # if not args.include_feature:
-        #     gt = view.original_image[0:3, :, :]
-            
-        # else:
-        #     gt, mask = view.get_language_feature(os.path.join(source_path, args.language_features_name), feature_level=args.feature_level)
+        image_name = view.image_name
+        image_index = image_name.split('_')[-1]
 
-        # np.save(os.path.join(render_npy_path, '{0:05d}'.format(idx) + ".npy"),rendering.permute(1,2,0).cpu().numpy())
-        # np.save(os.path.join(gts_npy_path, '{0:05d}'.format(idx) + ".npy"),gt.permute(1,2,0).cpu().numpy())
-        # torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
-        # torchvision.utils.save_image(gt, os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
+        t2 = time.time() - t1
+        t.append(t2)
+    t_average = sum(t) / len(t)
+    fps_average = 1 / t_average
+    print(f't_average = {t_average},fps_average = {fps_average}')
                
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool, args):
     with torch.no_grad():

@@ -218,20 +218,32 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
         colormap_min=-1.0,
         colormap_max=1.0,
     )
-    # if args.dataset_name == 'figurines':
-    #     prompt_dict = {"green apple":"what is green fruit","green toy chair":"what is suitable for people to sit down and is green","old camera":"what can be used to take pictures and is black","porcelain hand":"what is like a part of a person","red apple":"what is red fruit","red toy chair":"what is suitable for people to sit down and is red","rubber duck with red hat":"which is the small yellow rubber duck"}
-    # elif args.dataset_name == 'ramen':
-    #     prompt_dict = {"chopsticks":"which one is the chopstic on the side of yellow bowl","egg":"what is the round, golden, protein-rich object in the bowl","glass of water":"which one is a transparent cup with water in it", "pork belly":"which is the big piece of meat in the bowl", "wavy noodles in bowl":"which are long and thin noodles","yellow bowl":"which is the yellow bowl used to hold noodles"}
-    # elif args.dataset_name == 'teatime':
-    #     prompt_dict = {"apple":"which is red fruit","bag of cookies":"which is the brown bag on the side of the plate","coffee mug":"which cup is used for coffee","cookies on a plate":"which are the cookies","paper napkin":"what can be used to wipe hands","plate":"what can be used to hold cookies","sheep":"which is a cute white doll","spoon handle":"which is spoon handle","stuffed bear":"which is the brown bear doll","tea in a glass":"which is the drink in the transparent glass"}
-    # elif args.dataset_name == 'bed':
-    #     prompt_dict = {"banana":"which is the yellow fruit","black leather shoe":"which can be worn on the foot","camera":"which can be used to take photos","hand":"which is the part of person, excluding other objects","red bag":"which is red and leather","white sheet":"where is a good place to lie down"}       
-    # elif args.dataset_name == 'bench':
-    #     prompt_dict = {"dressing doll":"which is a cute humanoid doll that girls like","green grape":"which is green fruit","mini offroad car":"which one is the model of the vehicle","orange cat":"which is an animal","pebbled concrete wall":"which is made of many stones", "Portuguese egg tart":"which is like baked food","wood":"which is made of wood"}
     # elif args.dataset_name == 'lawn':
     #     prompt_dict = {"red apple":"which is the red fruit","New York Yankees cap":"which is worn on the head and is white","stapler":"which is small device used for stapling paper","black headphone":"which can convert electric signals into sounds","hand soap":"which is bottled", "green lawn":"which is an area of ground covered in short grass"}
-# 
-#   
+    if args.dataset_name == 'large_corridor_25':
+        # prompt_dict = {"green pot":"which is an object used for planting",
+        #             "white plush doll": "what is a white animal doll",
+        #             "white bottle": "which is bottle shaped",
+        #             "brown bowl": "which is a brown object that can be used for eating", 
+        #             "blue lunch box":"which is box with fruit patterns printed on it"}
+        prompt_dict = {"green pot":"which is an object used for planting",
+                    "white plush doll": "which is an object used for comfort",
+                    "white bottle": "which is an white bottle-shaped object",
+                    "brown bowl": "which is a brown object that can be used for eating", 
+                    "blue lunch box":"which is a blue object with dinosaur print"}
+    elif args.dataset_name == 'large_corridor_50':
+        prompt_dict = {"black and white shoe":"which is a black and white object that can be worn on the feet",
+                    "blue bag":"which is a blue object used for carrying items with balls patterns on it",
+                    "wooden box":"which is a brown object used for storing and organizing items",
+                    "black cable":"which is a black object used for connecting electronic devices",
+                    "colorful clock":"which is a colorful object used for telling time"}  
+    elif args.dataset_name == 'large_corridor_100':
+        prompt_dict = {"white and black shoe":"which is a white object that can be worn on the feet",
+                    "blue and yellow sandal":"which is a blue and yellow object that can be worn on the feet",
+                    "blue and white striped towel":"which is a blue and white object that can be used for wiping",
+                    "green plastic box":"which is a green object with holes that can be used for storage",
+                    "red and blue doll":"which is a red and blue object appearing in games"}
+    
     # print(views)
     for idx, view in enumerate(tqdm(views, desc="Rendering progress")):
         output_1 = render(view, gaussians_1, pipeline, background, args)
@@ -257,8 +269,8 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
         view_mask_path = os.path.join(mask_path, image_index)
         masks_name = os.listdir(view_mask_path)
         text_prompts = [mask_name.split('.')[0] for mask_name in masks_name]
-        # if args.reasoning:
-        #     text_prompts = [prompt_dict[text_prompt] for text_prompt in text_prompts]
+        if args.reasoning:
+            text_prompts = [prompt_dict[text_prompt] for text_prompt in text_prompts]
         gt_masks = [load_mask(os.path.join(view_mask_path, mask_name)) for mask_name in masks_name]
 
         sem_feat = torch.stack([language_feature_image_1, language_feature_image_2, language_feature_image_3]).permute(0, 2, 3, 1)
