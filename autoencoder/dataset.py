@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 
 class Autoencoder_dataset(Dataset):
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, mode='train'):
         data_names = glob.glob(os.path.join(data_dir, '*f.npy'))
         self.data_dic = {}
         for i in range(len(data_names)):
@@ -16,6 +16,9 @@ class Autoencoder_dataset(Dataset):
                 data = features
             else:
                 data = np.concatenate([data, features], axis=0)
+            if mode == 'train':
+                if data.shape[0] > 10000:
+                    break
         self.data = data
 
     def __getitem__(self, index):

@@ -90,6 +90,38 @@ def resize_mask(mask, target_shape):
     """Resize the mask to the target shape."""
     return np.array(Image.fromarray(mask).resize((target_shape[1], target_shape[0]), resample=Image.NEAREST))
 
+def get_box_by_mask(mask):
+    non_zero_indices = torch.nonzero(mask.float())
+    min_indices = torch.min(non_zero_indices, dim=0).values
+    max_indices = torch.max(non_zero_indices, dim=0).values
+    top_left = min_indices
+    bottom_right = max_indices
+    return [top_left[1].item(), top_left[0].item(), bottom_right[1].item(), bottom_right[0].item()]
+
+def draw_circle_box(img, center, radius, pt1, pt2, color, thickness, dash_length, gap_length):  
+                
+    cv2.circle(img, center, radius, color, thickness)  
+                
+    # 转换为整数坐标
+    pt1 = tuple(map(int, pt1))  
+    pt2 = tuple(map(int, pt2))   
+    # 绘制顶部边  
+    for x in range(pt1[0], pt2[0] + 1, dash_length + gap_length):  
+        end_x = min(x + dash_length, pt2[0])  
+        cv2.line(img, (x, pt1[1]), (end_x, pt1[1]), color, thickness)  
+    # 绘制底部边  
+    for x in range(pt1[0], pt2[0] + 1, dash_length + gap_length):  
+        end_x = min(x + dash_length, pt2[0])  
+        cv2.line(img, (x, pt2[1]), (end_x, pt2[1]), color, thickness)  
+    # 绘制左侧边  
+    for y in range(pt1[1], pt2[1] + 1, dash_length + gap_length):  
+        end_y = min(y + dash_length, pt2[1])  
+        cv2.line(img, (pt1[0], y), (pt1[0], end_y), color, thickness)  
+    # 绘制右侧边  
+    for y in range(pt1[1], pt2[1] + 1, dash_length + gap_length):  
+        end_y = min(y + dash_length, pt2[1])  
+        cv2.line(img, (pt2[0], y), (pt2[0], end_y), color, thickness)  
+
 def activate_stream(sem_map, 
                     gt_masks,
                     image, 
@@ -105,10 +137,15 @@ def activate_stream(sem_map,
     # chosen_iou_list, chosen_lvl_list = [], []
     iou_scores = {}
     biou_scores = {}
+    acc_num = 0
+    total_box = 0
     for k in range(n_prompt):
         iou_lvl = np.zeros(n_head)
         biou_lvl = np.zeros(n_head)
         mask_lvl = np.zeros((n_head, h, w), dtype=bool)
+        gt_mask_lvl = np.zeros((n_head, h, w), dtype=bool)
+        relevancy_lvl = torch.zeros((n_head, h, w))
+        composited_processed_map_lvl = np.zeros((n_head, h, w, 3), np.uint8)
         text_prompt = clip_model.positives[k]
         for i in range(n_head):
             # NOTE 加滤波结果后的激活值图中找最大值点
@@ -125,14 +162,18 @@ def activate_stream(sem_map,
                             output_path_relev)
             
             # NOTE 与lerf一致，激活值低于0.5的认为是背景
-            p_i = torch.clip(valid_map[i][k] - 0.5, 0, 1).unsqueeze(-1)
-            valid_composited = colormaps.apply_colormap(p_i / (p_i.max() + 1e-6), colormaps.ColormapOptions("turbo"))
-            mask = (valid_map[i][k] < 0.5).squeeze()
-            valid_composited[mask, :] = image[mask, :] * 0.3
-            output_path_compo = save_path / 'composited' / f'{clip_model.positives[k]}_{i}'
-            output_path_compo.parent.mkdir(exist_ok=True, parents=True)
-            colormap_saving(valid_composited, colormap_options, output_path_compo)
+            # p_i = torch.clip(valid_map[i][k] - 0.5, 0, 1).unsqueeze(-1)
+            # valid_composited = colormaps.apply_colormap(p_i / (p_i.max() + 1e-6), colormaps.ColormapOptions("turbo"))
+            # mask = (valid_map[i][k] < 0.5).squeeze()
+            # valid_composited[mask, :] = image[mask, :] * 0.3
+            # output_path_compo = save_path / 'composited' / f'{clip_model.positives[k]}_{i}'
+            # output_path_compo.parent.mkdir(exist_ok=True, parents=True)
+            # colormap_saving(valid_composited, colormap_options, output_path_compo)
+            # print(valid_composited.shape)
+            # composited_processed_map = (valid_composited.cpu().numpy() * 255).astype(np.uint8)    
+            # composited_processed_map_lvl[i] = composited_processed_map       
             
+
             # truncate the heatmap into mask
             output = valid_map[i][k]
             output = output - torch.min(output)
@@ -140,11 +181,33 @@ def activate_stream(sem_map,
             output = output * (1.0 - (-1.0)) + (-1.0)
             output = torch.clip(output, 0, 1)
 
-            mask_pred = (output.cpu().numpy() > thresh)
-            mask_lvl[i] = mask_pred
-            mask_pred = (smooth(mask_pred) * 255).astype(np.uint8)
+            relevancy_lvl[i] = output.cpu()
+
+            mask_pred_bool = (output.cpu().numpy() > thresh)
+            mask_lvl[i] = mask_pred_bool
+            mask_pred = (smooth(mask_pred_bool) * 255).astype(np.uint8)
+
+            # output_path_mask = save_path / 'mask' / f'{text_prompt}.png'
+            # output_path_mask.parent.mkdir(exist_ok=True, parents=True)
+            # Image.fromarray(mask_pred).save(str(output_path_mask))
+
+            # p_i = torch.clip(valid_map[i][k] - 0.5, 0, 1).unsqueeze(-1)
+            valid_composited = colormaps.apply_colormap(valid_map[i][k].unsqueeze(-1), colormaps.ColormapOptions("turbo",normalize=True, colormap_min=-1))
+            # mask = (valid_map[i][k] < 0.5).squeeze()
+            # print(valid_composited.shape)
+            # print(mask_lvl[i].shape)
+            # print(image.shape)
+            valid_composited[~mask_pred_bool, :] = image[~mask_pred_bool, :] * 0.3
+            output_path_compo = save_path / 'composited' / f'{clip_model.positives[k]}_{i}'
+            output_path_compo.parent.mkdir(exist_ok=True, parents=True)
+            colormap_saving(valid_composited, colormap_options, output_path_compo)
+
+            composited_processed_map = (valid_composited.cpu().numpy() * 255).astype(np.uint8)    
+            composited_processed_map_lvl[i] = composited_processed_map   
+
             gt_mask = gt_masks[k]
-            
+            # print(gt_mask.shape)
+
             # mask_gt = img_ann[clip_model.positives[k]]['mask'].astype(np.uint8)
             
             # calculate iou
@@ -154,6 +217,8 @@ def activate_stream(sem_map,
             # iou_lvl[i] = iou
             if mask_pred.shape != gt_mask.shape:
                 gt_mask = resize_mask(gt_mask, mask_pred.shape)
+            gt_mask_lvl[i] = gt_mask
+
             iou = calculate_iou(gt_mask, mask_pred)
             biou = boundary_iou(gt_mask, mask_pred)
             iou_lvl[i] = iou
@@ -171,8 +236,54 @@ def activate_stream(sem_map,
             score_lvl[i] = score
         chosen_lvl = torch.argmax(score_lvl)
         mask_pred = torch.from_numpy(mask_lvl[chosen_lvl])
+        relevancy = relevancy_lvl[chosen_lvl]
+        composited_processed_map = composited_processed_map_lvl[chosen_lvl]
+        max_relevancy_coord = torch.nonzero(relevancy == relevancy.max())[0]
+        gt_box = get_box_by_mask(torch.from_numpy(gt_mask_lvl[chosen_lvl]))
+        x1, y1, x2, y2 = gt_box
+        x_min, x_max = min(x1, x2), max(x1, x2)
+        y_min, y_max = min(y1, y2), max(y1, y2)
+
+        if (max_relevancy_coord[1] >= x_min and max_relevancy_coord[1] <= x_max and 
+            max_relevancy_coord[0] >= y_min and max_relevancy_coord[0] <= y_max):
+            acc_num += 1
+
+        total_box +=1
+
+        # for i in range(n_head):
+            # image = composited_processed_map
+            # 定义圆心和半径
+        x0 = int(max_relevancy_coord[1])
+        y0 = int(max_relevancy_coord[0])
+        center = (x0, y0)
+        radius = 9 
+        # 定义颜色（BGR格式）和线条粗细  
+        color = (255, 255, 255)
+        thickness = 3 
+        dash_length = 10  # 虚线段长度
+        gap_length = 5  # 虚线段间隔   
+
+        # gt_box是[x1, y1, x2, y2]格式，表示左上角(x1, y1)和右下角(x2, y2)。  
+        x1, y1, x2, y2 = gt_box
+        # 使用自定义函数绘制虚线矩形框
+        draw_circle_box(composited_processed_map, center, radius, (x1, y1), (x2, y2), color, thickness, dash_length, gap_length)  
+
+        # 保存图像到指定路径
+        output_path_composited_processed_map = save_path / 'composited_processed' / f'{clip_model.positives[k]}.png'
+        output_path_composited_processed_map.parent.mkdir(exist_ok=True, parents=True)
+        cv2.imwrite(str(output_path_composited_processed_map), composited_processed_map[:,:,::-1])
+
+
+
         iou_scores[text_prompt] = iou_lvl[chosen_lvl]
         biou_scores[text_prompt] = biou_lvl[chosen_lvl]
+
+        mask_pred_bool = mask_pred.cpu().numpy()
+        # mask_pred = 
+
+        output_path_mask = save_path / 'mask' / f'{text_prompt}.png'
+        output_path_mask.parent.mkdir(exist_ok=True, parents=True)
+        Image.fromarray((smooth(mask_pred_bool) * 255).astype(np.uint8)).save(str(output_path_mask))
 
         output_path_mask_map = save_path / 'mask_map' / f'{text_prompt}.jpg'
         output_path_mask_map.parent.mkdir(exist_ok=True, parents=True)
@@ -183,13 +294,19 @@ def activate_stream(sem_map,
         mask_map[:, ~mask_pred] /= 2
         # mask_3d = (mask_3d.cpu().numpy() * 255).astype(np.uint8)
         torchvision.utils.save_image(mask_map, str(output_path_mask_map))
+
+
+        output_path_rendering = save_path / 'renders' / f'rendering.jpg'
+        output_path_rendering.parent.mkdir(exist_ok=True, parents=True)
+        # print(image.shape)
+        torchvision.utils.save_image(image.permute(2, 0, 1), str(output_path_rendering))
         # chosen_lvl_list.append(chosen_lvl.cpu().numpy())
         
         # # save for visulsization
         # save_path = image_name / f'chosen_{clip_model.positives[k]}.png'
         # vis_mask_save(mask_lvl[chosen_lvl], save_path)
 
-    return iou_scores, biou_scores
+    return iou_scores, biou_scores, acc_num, total_box
 
 def render_set(model_path, source_path, name, iteration, views, gaussians_1, gaussians_2, gaussians_3, pipeline, background, args, clip_model, ae_model):
     # render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
@@ -212,6 +329,8 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
 
     iou_scores = {}
     biou_scores = {}
+    acc_nums = 0
+    total_boxes = 0
     colormap_options = colormaps.ColormapOptions(
         colormap="turbo",
         normalize=True,
@@ -270,18 +389,20 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
         language_feature_image_3 = output_3['language_feature_image']
         
         image_name = view.image_name
-        image_index = image_name.split('_')[-1]
+        # image_index = image_name.split('_')[-1]
+        # print(image_name)
+        # print(image_index)
         if args.reasoning:
             reasoning = '_reasoning'
         else:
             reasoning = ''
-        save_path = os.path.join(model_path, name, f"ours_{iteration}{reasoning}", '{0:05d}'.format(idx))
-        print(image_index)
-        print(test_views)
+        save_path = os.path.join(model_path, name, f"ours_{iteration}{reasoning}", f'{image_name}')
         
-        if image_index not in test_views:
+        if image_name not in test_views:
             continue
-        view_mask_path = os.path.join(mask_path, image_index)
+        # print(image_index)
+        # print(test_views)
+        view_mask_path = os.path.join(mask_path, image_name)
         masks_name = os.listdir(view_mask_path)
         text_prompts = [mask_name.split('.')[0] for mask_name in masks_name]
         if args.reasoning:
@@ -295,7 +416,7 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
         clip_model.set_positives(text_prompts)
         # valid_map = clip_model.get_max_across(sem_map)
 
-        iou_score, biou_score = activate_stream(restored_feat,
+        iou_score, biou_score, acc_num, total_box = activate_stream(restored_feat,
                                                 gt_masks,
                                                 rendering.permute(1, 2, 0),
                                                 clip_model,
@@ -304,6 +425,8 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
                                                 0.4,
                                                 colormap_options,
                                                 )
+        acc_nums += acc_num
+        total_boxes += total_box
         # print(iou_score)
         # print(biou_score)
         for key in iou_score.keys():
@@ -323,7 +446,8 @@ def render_set(model_path, source_path, name, iteration, views, gaussians_1, gau
         mean_ious.append(mean_iou)
         mean_bious.append(mean_biou)
         print(f'{key} iou: {mean_iou} biou: {mean_biou}')
-    print(f'mean iou: {np.mean(mean_ious)} biou: {np.mean(mean_bious)}')
+    acc = round(acc_nums / total_boxes, 5)
+    print(f'mean iou: {np.mean(mean_ious)} biou: {np.mean(mean_bious)} acc: {acc}')
     
         # if not args.include_feature:
             

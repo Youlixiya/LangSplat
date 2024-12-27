@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
 
     checkpoint = torch.load(ckpt_path)
-    train_dataset = Autoencoder_dataset(data_dir)
+    train_dataset = Autoencoder_dataset(data_dir, 'test')
 
     test_loader = DataLoader(
         dataset=train_dataset, 

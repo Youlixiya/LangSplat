@@ -39,7 +39,7 @@ if __name__ == '__main__':
     # print(dataset_path)
     data_dir = f"../{dataset_path}/language_features"
     os.makedirs(f'ckpt/{args.dataset_name}', exist_ok=True)
-    train_dataset = Autoencoder_dataset(data_dir)
+    train_dataset = Autoencoder_dataset(data_dir, 'train')
     train_loader = DataLoader(
         dataset=train_dataset,
         batch_size=64,

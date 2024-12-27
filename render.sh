@@ -61,7 +61,12 @@ CUDA_VISIBLE_DEVICES=0 python render_time.py -s data/gsgrouping/figurines -m out
 
 
 CUDA_VISIBLE_DEVICES=1 python render_nerfiles.py -s data/hypernerf/chickchicken -m output/chickchicken_1 --dataset_name chickchicken --include_feature --skip_train
-CUDA_VISIBLE_DEVICES=1 python render_nerfiles.py -s data/hypernerf/split-cookie -m output/split-cookie_1 --dataset_name split-cookie --include_feature --skip_train
+CUDA_VISIBLE_DEVICES=0 python render_nerfiles.py -s data/hypernerf/split-cookie -m output/split-cookie_1 --dataset_name split-cookie --include_feature --skip_train
 CUDA_VISIBLE_DEVICES=2 python render_nerfiles.py -s data/hypernerf/torchocolate -m output/torchocolate_1 --dataset_name torchocolate --include_feature --skip_train
-CUDA_VISIBLE_DEVICES=3 python render_nerfiles.py -s data/hypernerf/americano -m output/americano_1 --dataset_name americano --include_feature --skip_train
-CUDA_VISIBLE_DEVICES=4 python render_nerfiles.py -s data/hypernerf/slice-banana -m output/slice-banana_1 --dataset_name slice-banana --include_feature --skip_train
+CUDA_VISIBLE_DEVICES=2 python render_nerfiles.py -s data/hypernerf/americano -m output/americano_1 --dataset_name americano --include_feature --skip_train
+CUDA_VISIBLE_DEVICES=3 python render_nerfiles.py -s data/hypernerf/slice-banana -m output/slice-banana_1 --dataset_name slice-banana --include_feature --skip_train
+CUDA_VISIBLE_DEVICES=3 python render_nerfiles.py -s data/NeRF-DS/as_novel_view -m output/asnovelview_1 --dataset_name as_novel_view --include_feature --skip_train
+CUDA_VISIBLE_DEVICES=4 python render_nerfiles.py -s data/NeRF-DS/basin_novel_view -m output/basinnovelview_1 --dataset_name basin_novel_view --include_feature --skip_train
+CUDA_VISIBLE_DEVICES=4 python render_nerfiles.py -s data/NeRF-DS/cup_novel_view -m output/cupnovelview_1 --dataset_name cup_novel_view --include_feature --skip_train
+CUDA_VISIBLE_DEVICES=5 python render_nerfiles.py -s data/NeRF-DS/bell_novel_view -m output/bellnovelview_1 --dataset_name bell_novel_view --include_feature --skip_train
+CUDA_VISIBLE_DEVICES=5 python render_nerfiles.py -s data/NeRF-DS/sieve_novel_view -m output/sievenovelview_1 --dataset_name sieve_novel_view --include_feature --skip_train
